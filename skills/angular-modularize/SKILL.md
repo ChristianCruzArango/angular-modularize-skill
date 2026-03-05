@@ -1,20 +1,22 @@
 ---
 name: angular-modularize
 description: >
-  Modularizes existing Angular components and projects following official best
-  practices, SOLID principles, and the Smart/Presentational pattern. Use when
-  the user asks to "modularize", "refactor component", "split component",
-  "extract component", "decompose component", "organize Angular project",
-  "apply Angular best practices", "split into feature modules", "restructure
-  project", or "improve project structure".
+  Modularizes existing Angular components and projects following official
+  angular.dev best practices, SOLID principles, and the Smart/Presentational
+  pattern. Use when the user asks to "modularize", "refactor component",
+  "split component", "extract component", "decompose component", "organize
+  Angular project", "apply Angular best practices", "split into feature
+  modules", "restructure project", or "improve project structure".
 allowed-tools: Read, Grep, Glob, Edit, Write, Bash, Agent
 ---
 
 # Angular Modularization — Universal Best Practices
 
-You are an expert Angular architect. These guidelines are **universal** and apply
-to any Angular project regardless of domain or size. Always adapt to the Angular
-version detected in the project.
+You are an expert Angular architect. These guidelines are **universal** for any
+Angular project. Always detect the Angular version first and adapt accordingly.
+
+**Sources:** angular.dev style guide, angular.dev component/signals/DI guides,
+Smart/Presentational pattern, SOLID principles.
 
 ---
 
@@ -22,7 +24,7 @@ version detected in the project.
 
 Before making ANY change:
 
-1. **Read `package.json`** → identify `@angular/core` version
+1. **Read `package.json`** → detect `@angular/core` version
 2. **Scan structure** → `Glob("**/*.component.ts")`, `Glob("**/*.module.ts")`, `Glob("**/*.routes.ts")`
 3. **Detect standalone** → `Grep("standalone", glob="**/*.component.ts")`
 4. **Identify large components** → read `.ts` and `.html` files, count lines, list responsibilities
@@ -37,11 +39,11 @@ Before making ANY change:
 
 > "Each class should have only ONE reason to change." — SOLID
 
-Before each code change, ask: **what responsibilities does this component have?**
-If you can describe it with more than one "AND", it needs refactoring.
+Ask: **what responsibilities does this component have?** If you describe it with
+more than one "AND", it violates SRP and needs refactoring.
 
-**Example violation:** "This component fetches users AND renders the list AND handles
-the create form AND validates input AND manages pagination."
+**Violation example:** "This component fetches users AND renders the list AND
+handles the create form AND validates input AND manages pagination."
 
 ### Smell Indicators — When a Component MUST Be Split
 
@@ -49,32 +51,30 @@ the create form AND validates input AND manages pagination."
 |-----------|-----------|--------|
 | Template (HTML) lines | > 100 lines | Extract child components |
 | Component class lines | > 200 lines | Extract logic to services |
-| File total lines | > 400 lines | Split responsibilities (Angular style guide rule) |
-| Constructor/inject dependencies | > 5 | Component has too many concerns |
-| Distinct `@if` sections (or `*ngIf` in legacy code) | > 3 unrelated blocks | Each block → child component |
-| Distinct `@for` loops (or `*ngFor` in legacy code) | > 2 different data sources | Each list → child component |
-| Component fetches data AND renders it | Mixed smart/presentational | Split into container + presentational |
-| Repeated HTML blocks | Same block appears 2+ times | Extract to shared component |
+| File total lines | > 400 lines | Split responsibilities (angular.dev style guide) |
+| `inject()` calls or constructor params | > 5 | Too many concerns, split |
+| Distinct `@if` blocks (or `*ngIf` in legacy) | > 3 unrelated sections | Each section → child component |
+| Distinct `@for` loops (or `*ngFor` in legacy) | > 2 different data sources | Each list → child component |
+| Component fetches data AND renders | Mixed smart/presentational | Split into container + presentational |
+| Repeated HTML blocks | Same block 2+ times | Extract to shared component |
 | Multiple form groups | > 2 in same component | Each form section → child component |
-| Component name is generic | `MainComponent`, `PageComponent` | Rename to reflect single responsibility |
+| Generic component name | `MainComponent`, `PageComponent` | Rename to reflect single responsibility |
 
 ### When a Component Should NOT Be Split
 
 | Criteria | Reason |
 |----------|--------|
 | Template < 50 lines with single responsibility | Already small enough |
-| Component used only once with no children | No reuse benefit, splitting adds overhead |
+| Used only once, no children | No reuse benefit |
 | Simple wrapper (< 3 inputs, no logic) | Already granular |
-| Splitting requires passing > 5 inputs down | Creates prop drilling (worse than monolith) |
-| Component tightly coupled to parent lifecycle | Splitting breaks interaction model |
+| Splitting needs > 5 inputs passed down | Creates prop drilling (worse) |
+| Tightly coupled to parent lifecycle | Splitting breaks interaction |
 | Feature has < 3 files total | Module overhead exceeds benefit |
-| App has < 10 components total | Over-engineering for small apps |
+| App has < 10 components total | Over-engineering |
 
 ---
 
 ## Step 3: Decompose a Monolithic Component
-
-This is the **core process** for modularizing an existing component.
 
 ### 3.1 List Every Responsibility
 
@@ -83,69 +83,55 @@ Read the component and enumerate what it does:
 ```
 Analysis of a monolithic OrderPageComponent:
 1. Fetches order data from API          → Extract to OrderService
-2. Displays order header info           → Extract to OrderHeaderComponent (presentational)
-3. Renders line items table             → Extract to OrderItemsTableComponent (presentational)
-4. Handles payment form                 → Extract to PaymentFormComponent (presentational)
-5. Shows order status timeline          → Extract to OrderTimelineComponent (presentational)
-6. Manages form validation              → Extract to OrderFormService or validators file
-7. Handles error/loading states         → Keep in smart component, pass state to children
+2. Displays order header info           → OrderHeaderComponent (presentational)
+3. Renders line items table             → OrderItemsTableComponent (presentational)
+4. Handles payment form                 → PaymentFormComponent (presentational)
+5. Manages form validation              → Validators file or form service
+6. Handles error/loading states         → Keep in smart component
 ```
 
 ### 3.2 Classify: Smart vs Presentational
 
 | Type | Characteristics | Rules |
 |------|----------------|-------|
-| **Smart (Container)** | Injects services, fetches data, manages state, coordinates children | One per route/feature. Knows WHERE data comes from. |
-| **Presentational (Dumb)** | Receives data via `input()`, emits events via `output()`, renders UI only | No service injection. No business logic. Reusable across contexts. Does NOT know where data comes from. |
+| **Smart (Container)** | Injects services via `inject()`, fetches data, manages state with signals, coordinates children | One per route/feature. Knows WHERE data comes from. |
+| **Presentational (Dumb)** | Receives data via `input()`/`input.required()`, emits events via `output()`, renders UI only | No service injection. No business logic. Reusable in any context. Does NOT know where data comes from. |
 
-**Key test:** If the component wouldn't work in a completely different application
-without modification → it's smart. If it would → it's presentational.
+**Key test:** If the component wouldn't work in a different app without modification → smart.
+If it would → presentational.
 
-### 3.3 Classify Each Responsibility
+### 3.3 Where Each Responsibility Goes
 
-| Responsibility Type | Destination | Rule |
-|---------------------|------------|------|
-| API calls, data fetching | Service in `services/` | Never in presentational components |
+| Responsibility | Destination | Rule |
+|----------------|------------|------|
+| API calls, data fetching | Service with `httpResource()` or `HttpClient` | Never in presentational components |
 | Business logic, calculations | Service or utility file | Components should not contain business rules |
 | Reusable UI block | `shared/components/` | If used in 2+ features |
-| Feature-specific UI block | Child component in same feature | If used only here |
-| Form validation rules | Validators file or service | Keep testable and reusable |
-| State management | Service with signals or BehaviorSubject | Components are NOT the source of truth |
+| Feature-specific UI block | Child component in same feature dir | If used only here |
+| Form validation rules | Validators file or service | Testable and reusable |
+| State management | Service with `signal()`, `computed()`, `linkedSignal()` | Components are NOT the source of truth |
 
 ### 3.4 Extract — Before and After
 
-**BEFORE — Monolithic (violates SRP, uses legacy patterns to show what needs refactoring):**
+**BEFORE — Monolithic (violates SRP, uses legacy patterns to show what to refactor):**
 
 ```typescript
 // BEFORE: legacy patterns — *ngFor, *ngIf, constructor injection, no OnPush, no signals
 @Component({
   selector: 'app-order-page',
   template: `
-    <!-- Responsibility 1: Order header -->
     <div class="header">
       <h1>{{ order?.title }}</h1>
       <span>{{ order?.status }}</span>
-      <p>{{ order?.date | date:'longDate' }}</p>
     </div>
-
-    <!-- Responsibility 2: Items table -->
     <table>
       <tr *ngFor="let item of order?.items">
         <td>{{ item.name }}</td>
         <td>{{ item.price | currency }}</td>
-        <td>{{ item.quantity }}</td>
-      </tr>
-      <tr>
-        <td colspan="2">Total</td>
-        <td>{{ calculateTotal() | currency }}</td>
       </tr>
     </table>
-
-    <!-- Responsibility 3: Payment form -->
     <form [formGroup]="paymentForm" (ngSubmit)="submitPayment()">
-      <input formControlName="cardNumber" placeholder="Card number">
-      <input formControlName="expDate" placeholder="MM/YY">
-      <input formControlName="cvv" placeholder="CVV">
+      <input formControlName="cardNumber">
       <div *ngIf="paymentForm.get('cardNumber')?.errors?.['required']">
         Card number is required
       </div>
@@ -173,43 +159,34 @@ export class OrderPageComponent implements OnInit {
 
   ngOnInit(): void {
     const id = this.route.snapshot.params['id'];
-    this.http.get<Order>(`/api/orders/${id}`).subscribe(order => {
-      this.order = order;
-    });
-  }
-
-  calculateTotal(): number {
-    return this.order?.items.reduce((sum, item) => sum + item.price * item.quantity, 0) ?? 0;
+    this.http.get<Order>(`/api/orders/${id}`).subscribe(order => this.order = order);
   }
 
   submitPayment(): void {
-    if (this.paymentForm.valid) {
-      this.http.post('/api/payments', {
-        orderId: this.order?.id,
-        ...this.paymentForm.value
-      }).subscribe({
-        next: () => {
-          this.notificationService.success('Payment completed');
-          this.router.navigate(['/orders']);
-        },
-        error: () => this.notificationService.error('Payment failed')
-      });
-    }
+    this.http.post('/api/payments', {
+      orderId: this.order?.id,
+      ...this.paymentForm.value
+    }).subscribe({
+      next: () => this.router.navigate(['/orders']),
+      error: () => this.notificationService.error('Payment failed')
+    });
   }
 }
 ```
 
-**AFTER — Modularized (each piece has ONE responsibility):**
+**AFTER — Modularized with modern Angular (v19+):**
 
 ```typescript
-// order.service.ts — Data fetching responsibility
+// order.service.ts — Data fetching (uses httpResource for reads, HttpClient for mutations)
 @Injectable({ providedIn: 'root' })
 export class OrderService {
   private readonly http = inject(HttpClient);
 
-  loadOrder(id: string): Observable<Order> {
-    return this.http.get<Order>(`/api/orders/${id}`);
-  }
+  readonly orderResource = httpResource<Order>(() => ({
+    url: `/api/orders/${this.currentOrderId()}`
+  }));
+
+  readonly currentOrderId = signal<string>('');
 
   submitPayment(orderId: string, payment: PaymentData): Observable<PaymentResult> {
     return this.http.post<PaymentResult>('/api/payments', { orderId, ...payment });
@@ -218,7 +195,7 @@ export class OrderService {
 ```
 
 ```typescript
-// order-header.component.ts — Presentational (display only)
+// order-header.component.ts — Presentational (display only, no services)
 @Component({
   selector: 'app-order-header',
   template: `
@@ -248,8 +225,10 @@ export class OrderHeaderComponent {
           <td>{{ item.price | currency }}</td>
           <td>{{ item.quantity }}</td>
         </tr>
+      } @empty {
+        <tr><td colspan="3">No items</td></tr>
       }
-      <tr>
+      <tr class="total">
         <td colspan="2">Total</td>
         <td>{{ total() | currency }}</td>
       </tr>
@@ -260,6 +239,7 @@ export class OrderHeaderComponent {
 })
 export class OrderItemsTableComponent {
   readonly items = input.required<OrderItem[]>();
+
   protected readonly total = computed(() =>
     this.items().reduce((sum, item) => sum + item.price * item.quantity, 0)
   );
@@ -267,7 +247,7 @@ export class OrderItemsTableComponent {
 ```
 
 ```typescript
-// payment-form.component.ts — Presentational (form UI + validation display)
+// payment-form.component.ts — Presentational (form UI, no API calls)
 @Component({
   selector: 'app-payment-form',
   template: `
@@ -275,7 +255,7 @@ export class OrderItemsTableComponent {
       <input formControlName="cardNumber" placeholder="Card number">
       <input formControlName="expDate" placeholder="MM/YY">
       <input formControlName="cvv" placeholder="CVV">
-      @if (form.get('cardNumber')?.errors?.['required']) {
+      @if (form.get('cardNumber')?.hasError('required')) {
         <div class="error">Card number is required</div>
       }
       <button type="submit" [disabled]="form.invalid || submitting()">Pay</button>
@@ -287,7 +267,7 @@ export class OrderItemsTableComponent {
 export class PaymentFormComponent {
   private readonly fb = inject(FormBuilder);
 
-  readonly submitting = input<boolean>(false);
+  readonly submitting = input(false);
   readonly paymentSubmitted = output<PaymentData>();
 
   protected readonly form = this.fb.group({
@@ -305,40 +285,41 @@ export class PaymentFormComponent {
 ```
 
 ```typescript
-// order-page.component.ts — Smart/Container (orchestrates everything)
+// order-page.component.ts — Smart/Container (orchestrates children, manages state)
 @Component({
   selector: 'app-order-page',
   template: `
-    @if (order(); as order) {
-      <app-order-header [order]="order" />
-      <app-order-items-table [items]="order.items" />
+    @if (orderService.orderResource.hasValue()) {
+      <app-order-header [order]="orderService.orderResource.value()!" />
+      <app-order-items-table [items]="orderService.orderResource.value()!.items" />
       <app-payment-form
         [submitting]="submitting()"
         (paymentSubmitted)="onPaymentSubmit($event)" />
-    } @else {
+    } @else if (orderService.orderResource.isLoading()) {
       <p>Loading order...</p>
+    } @else if (orderService.orderResource.error()) {
+      <p>Error loading order</p>
     }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [OrderHeaderComponent, OrderItemsTableComponent, PaymentFormComponent]
 })
 export class OrderPageComponent {
-  private readonly orderService = inject(OrderService);
+  protected readonly orderService = inject(OrderService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly notificationService = inject(NotificationService);
 
-  protected readonly order = signal<Order | null>(null);
   protected readonly submitting = signal(false);
 
   constructor() {
-    const id = this.route.snapshot.params['id'];
-    this.orderService.loadOrder(id).subscribe(order => this.order.set(order));
+    this.orderService.currentOrderId.set(this.route.snapshot.params['id']);
   }
 
   protected onPaymentSubmit(payment: PaymentData): void {
     this.submitting.set(true);
-    this.orderService.submitPayment(this.order()!.id, payment).subscribe({
+    const orderId = this.orderService.orderResource.value()!.id;
+    this.orderService.submitPayment(orderId, payment).subscribe({
       next: () => {
         this.notificationService.success('Payment completed');
         this.router.navigate(['/orders']);
@@ -356,51 +337,65 @@ export class OrderPageComponent {
 
 | Pattern | When to Use |
 |---------|------------|
-| Parent passes data via `input()` | Simple data flow, < 3 levels deep |
-| Shared service with signals | Multiple siblings need same reactive state |
+| Parent passes data via `input()` | Simple flow, < 3 levels deep |
+| Shared service with `signal()` / `computed()` | Multiple siblings need same reactive state |
 | `output()` events up + `input()` down | Parent orchestrates child interactions |
+| `model()` two-way binding | Parent and child need to sync a value |
+| `linkedSignal()` | Dependent state that resets when source changes but remains writable |
 | NgRx / signal store | Complex state with many consumers across features |
 
 **Rule:** Never create a service just to avoid passing one input. Use services when
-3+ components need the same state or when prop drilling exceeds 3 levels.
+3+ components need the same state or prop drilling exceeds 3 levels.
 
 ---
 
-## Step 4: Project-Level Modularization
+## Step 4: Project-Level Structure
 
-### Directory Structure by Angular Version
+### Angular v19+ (Standalone by default)
 
-#### Angular v17+ (Standalone)
+Components are standalone by default. No need for `standalone: true` explicitly.
 
 ```
 src/app/
 ├── app.component.ts
-├── app.config.ts
+├── app.config.ts                    # provideRouter, provideHttpClient, etc.
 ├── app.routes.ts
-├── core/                          # Singletons — imported ONCE at root
+├── core/                            # Singletons — imported ONCE at root
 │   ├── interceptors/
+│   │   └── auth.interceptor.ts      # functional interceptor
 │   ├── guards/
+│   │   └── auth.guard.ts            # functional guard (CanActivateFn)
 │   └── services/
-├── shared/                        # Reusable, STATELESS components
+│       └── auth.service.ts          # providedIn: 'root'
+├── shared/                          # Reusable, STATELESS
 │   ├── components/
+│   │   └── data-table/
+│   │       ├── data-table.component.ts
+│   │       ├── data-table.component.html
+│   │       ├── data-table.component.css
+│   │       └── data-table.component.spec.ts
 │   ├── directives/
 │   ├── pipes/
 │   └── models/
-└── features/                      # Lazy-loaded business domains
+└── features/                        # Lazy-loaded business domains
     └── users/
         ├── user-list/
-        │   ├── user-list.component.ts
+        │   ├── user-list.component.ts       # smart/container
         │   ├── user-list.component.html
         │   ├── user-list.component.spec.ts
-        │   └── components/        # Child presentational components
+        │   └── components/                  # presentational children
         │       └── user-card/
+        │           ├── user-card.component.ts
+        │           └── user-card.component.spec.ts
         ├── user-detail/
         ├── services/
+        │   └── user.service.ts
         ├── models/
+        │   └── user.model.ts
         └── users.routes.ts
 ```
 
-#### Angular v14-v16 (NgModules)
+### Angular v14-v16 (NgModules)
 
 ```
 src/app/
@@ -421,34 +416,34 @@ src/app/
 
 ### Module Boundary Rules
 
-| Module | Contains | Rules |
-|--------|----------|-------|
-| **Core** | Singletons: auth service, interceptors, guards, app-wide services | `providedIn: 'root'`. Imported ONCE at root. Never in features. |
-| **Shared** | Reusable UI: buttons, tables, pipes, directives, models | **Stateless only**. No services with state. Barrel exports for public API. |
-| **Feature** | Business domain: components, routes, feature services, models | Self-contained. Lazy-loaded. No cross-feature imports. Smart + presentational pattern. |
+| Directory | Contains | Rules |
+|-----------|----------|-------|
+| **core/** | Auth, interceptors, guards, app-wide services | `providedIn: 'root'`. Imported ONCE at root. Never in features. |
+| **shared/** | Reusable UI: buttons, tables, pipes, directives | **Stateless only**. No services with state. Barrel exports for public API. |
+| **features/** | Business domains with routing | Self-contained. Lazy-loaded. No cross-feature imports. Smart + presentational. |
 
-### When TO Create a Feature Module/Directory
+### When TO Create a Feature Directory
 
-- Feature has its own route (`/users`, `/orders`)
-- 3+ related components work together
-- Feature benefits from lazy loading
-- Different team owns the feature
-- Business domain is clearly bounded
+- Feature has its own route
+- 3+ related components
+- Benefits from lazy loading
+- Distinct business domain
 
-### When NOT to Create a Feature Module/Directory
+### When NOT to Create a Feature Directory
 
-- App has < 10 components total
-- Single component with no children or subroutes
-- Splitting would create circular dependencies
-- Feature always loads at startup (no lazy loading benefit)
+- App < 10 components total
+- Single component with no subroutes
+- Would create circular dependencies
+- Always loads at startup anyway
 
 ---
 
 ## Step 5: Lazy Loading
 
-### Standalone (v17+)
+### Route-based (v19+)
 
 ```typescript
+// app.routes.ts
 export const routes: Routes = [
   {
     path: 'users',
@@ -463,6 +458,28 @@ export const routes: Routes = [
 ];
 ```
 
+### Deferred Loading with `@defer` (v17+)
+
+For heavy components within a page. Component inside `@defer` MUST be standalone.
+
+```html
+@defer (on viewport) {
+  <app-heavy-chart [data]="chartData()" />
+} @placeholder (minimum 200ms) {
+  <div class="skeleton">Chart loading...</div>
+} @loading (after 100ms; minimum 500ms) {
+  <app-spinner />
+} @error {
+  <p>Failed to load chart</p>
+}
+```
+
+**Triggers:** `on idle` (default), `on viewport`, `on interaction`, `on hover`,
+`on timer(500ms)`, `when condition`, `on immediate`.
+
+**Prefetching:** `@defer (on interaction; prefetch on idle)` — loads JS in background
+before user triggers it.
+
 ### NgModules (v14-v16)
 
 ```typescript
@@ -475,68 +492,147 @@ const routes: Routes = [
 ];
 ```
 
-### Deferred Loading with `@defer` (v17+)
-
-For heavy components within a page:
-
-```html
-@defer (on viewport) {
-  <app-heavy-chart [data]="chartData()" />
-} @placeholder {
-  <div class="skeleton">Loading chart...</div>
-}
-```
-
 ---
 
-## Step 6: Component Best Practices
+## Step 6: Modern Angular APIs (v19+)
 
-### Modern Pattern (v17+ Standalone)
+### Signals — Reactive State
 
 ```typescript
-@Component({
-  selector: 'app-user-list',
-  templateUrl: './user-list.component.html',
-  styleUrl: './user-list.component.css',
-  changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, RouterLink]
-})
-export class UserListComponent {
-  // Inputs/Outputs first
-  readonly users = input.required<User[]>();
-  readonly userSelected = output<User>();
+// Writable signal
+protected readonly count = signal(0);
 
-  // Computed state
-  protected readonly activeUsers = computed(() =>
-    this.users().filter(u => u.active)
-  );
+// Read-only computed
+protected readonly doubled = computed(() => this.count() * 2);
+
+// Dependent writable state (resets when source changes, but still writable)
+protected readonly selectedOption = linkedSignal(() => this.options()[0]);
+
+// Side effects
+effect(() => {
+  console.log('Count changed:', this.count());
+});
+```
+
+### Component Communication
+
+```typescript
+// Inputs (signal-based, read-only)
+readonly name = input<string>();                    // optional
+readonly id = input.required<number>();             // required
+readonly disabled = input(false);                   // with default
+readonly width = input(0, { transform: numberAttribute }); // with transform
+
+// Two-way binding (writable input + automatic output)
+readonly value = model(0);                          // parent uses [(value)]="signal"
+
+// Outputs (event emitter)
+readonly closed = output<void>();
+readonly selected = output<User>();
+```
+
+### Data Fetching
+
+```typescript
+// httpResource for GET requests (reactive, signal-based)
+readonly usersResource = httpResource<User[]>(() => '/api/users');
+
+// resource() for custom async operations
+readonly dataResource = resource({
+  params: () => ({ id: this.userId() }),
+  loader: ({ params, abortSignal }) =>
+    fetch(`/api/data/${params.id}`, { signal: abortSignal }).then(r => r.json())
+});
+
+// HttpClient for mutations (POST, PUT, DELETE)
+this.http.post('/api/users', userData).subscribe();
+```
+
+### Template Control Flow
+
+```html
+@if (user(); as u) {
+  <h1>{{ u.name }}</h1>
+} @else {
+  <p>No user</p>
+}
+
+@for (item of items(); track item.id) {
+  <app-item-card [item]="item" />
+} @empty {
+  <p>No items found</p>
+}
+
+@switch (status()) {
+  @case ('active') { <app-active-badge /> }
+  @case ('inactive') { <app-inactive-badge /> }
+  @default { <span>Unknown</span> }
 }
 ```
 
-### Key Rules
+### Dependency Injection
 
-- **`ChangeDetectionStrategy.OnPush`** on ALL components — avoids unnecessary re-renders
-- **`inject()` function** instead of constructor injection — better type inference
-- **Signals** (`signal`, `computed`, `effect`) for reactive state
-- **`input()` / `output()`** signal-based APIs for component communication (v17+)
-- **Never mutate inputs** — create new references, Angular uses `===` equality check
-- **Template control flow** — `@if`, `@for`, `@switch` instead of `*ngIf`, `*ngFor` (v17+)
-- **Co-locate files** — `.ts`, `.html`, `.css`, `.spec.ts` in the same directory
+```typescript
+// inject() function — preferred over constructor injection
+private readonly http = inject(HttpClient);
+private readonly router = inject(Router);
+private readonly destroyRef = inject(DestroyRef);
+
+// Cleanup with DestroyRef (replaces ngOnDestroy)
+constructor() {
+  this.destroyRef.onDestroy(() => {
+    // cleanup logic
+  });
+}
+```
+
+### Lifecycle
+
+```typescript
+// Still valid: ngOnInit, ngOnChanges, ngOnDestroy, etc.
+// Modern additions:
+afterNextRender(() => {
+  // DOM manipulation after first render (SSR-safe)
+});
+
+afterEveryRender(() => {
+  // runs after every render cycle
+});
+```
 
 ---
 
-## Step 7: Naming Conventions
+## Step 7: Component Best Practices Summary
 
-- **kebab-case** for file names: `user-profile.component.ts`
-- **Pattern**: `<name>.<type>.ts`
-- **Suffixes**: `Component`, `Service`, `Directive`, `Pipe`, `Guard`, `Interceptor`
-- **One concept per file** — never multiple components in one file
-- **Avoid generic names** — `utils.ts`, `helpers.ts`, `common.ts` → be specific
+Every component MUST follow these rules:
+
+- **`ChangeDetectionStrategy.OnPush`** on ALL components
+- **`inject()` function** for dependency injection (not constructor params)
+- **`input()` / `input.required()`** for inputs (not `@Input()` decorator)
+- **`output()`** for events (not `@Output()` decorator)
+- **`model()`** for two-way binding
+- **Signals** (`signal`, `computed`, `linkedSignal`) for reactive state
+- **`@if`, `@for`, `@switch`** control flow (not `*ngIf`, `*ngFor`)
+- **`readonly`** on properties initialized by Angular (`input`, `output`, queries)
+- **`protected`** for members only used in templates
+- **Co-locate** `.ts`, `.html`, `.css`, `.spec.ts` in same directory
+- **One concept per file** — one component/service/directive per file
+- **kebab-case** file names: `user-profile.component.ts`
+
+---
+
+## Step 8: Naming Conventions
+
+- **Files:** `<name>.<type>.ts` → `user-list.component.ts`, `auth.guard.ts`, `date-format.pipe.ts`
+- **Classes:** `UserListComponent`, `AuthService`, `DateFormatPipe`
+- **Selectors:** `app-user-list` (kebab-case with prefix)
+- **Event handlers:** name by action performed, not trigger → `saveUser()` not `handleClick()`
+- **Avoid:** `utils.ts`, `helpers.ts`, `common.ts` — be specific
 - **Barrel exports** (`index.ts`) only for public APIs, never for internals
 
 ---
 
-## Step 8: NgModule → Standalone Migration
+## Step 9: NgModule → Standalone Migration
 
 When project uses NgModules and Angular v14+:
 
@@ -555,50 +651,55 @@ When project uses NgModules and Angular v14+:
 
 ---
 
-## Step 9: Anti-Patterns
+## Step 10: Anti-Patterns
 
-| Anti-Pattern | Why It's Bad | Fix |
-|-------------|-------------|-----|
-| God component (> 200 lines class) | Violates SRP, hard to test | Split into smart + presentational |
-| God module (50+ declarations) | Hard to navigate, slow compilation | Split into feature modules |
-| Prop drilling (> 3 levels) | Fragile, hard to refactor | Use shared service with signals |
-| Cross-feature imports | Creates coupling, breaks lazy loading | Communicate via shared services |
-| Services in `shared/` | Shared should be stateless | Move stateful services to `core/` |
-| Business logic in templates | Untestable, hard to read | Move to computed signals or methods |
-| Fat templates (> 100 lines) | Multiple responsibilities in one view | Extract child components |
-| Generic file names | Hard to find and understand | Name by specific responsibility |
-| Circular dependencies | Build failures, tight coupling | Restructure boundaries |
-| Mixed concerns in component | Fetching + rendering + validation | Separate into service + smart + presentational |
+| Anti-Pattern | Fix |
+|-------------|-----|
+| God component (> 200 lines class) | Split into smart + presentational |
+| God module (50+ declarations) | Split into feature modules |
+| Prop drilling (> 3 levels) | Shared service with signals |
+| Cross-feature imports | Communicate via shared services |
+| Services in `shared/` | Move stateful services to `core/` |
+| Business logic in templates | Move to `computed()` or methods |
+| Fat templates (> 100 lines) | Extract child components |
+| Generic file names | Name by specific responsibility |
+| Circular dependencies | Restructure module boundaries |
+| `@Input`/`@Output` decorators | Use `input()`/`output()` signal APIs |
+| `*ngIf`/`*ngFor` directives | Use `@if`/`@for` control flow |
+| Constructor injection | Use `inject()` function |
+| Default change detection | Use `ChangeDetectionStrategy.OnPush` |
+| `subscribe()` for GET requests | Use `httpResource()` or `resource()` |
+| Manual `ngOnDestroy` cleanup | Use `DestroyRef.onDestroy()` |
 
 ---
 
-## Step 10: Refactoring Checklist
+## Step 11: Refactoring Checklist
 
 Execute in this order:
 
-1. **Identify large components** — read all `.html` and `.ts` files, list candidates
-2. **Split monolithic components** — apply Step 3 for each candidate
-3. **Create directory structure** — `core/`, `shared/`, `features/`
-4. **Extract core services** — auth, interceptors, guards → `core/`
-5. **Extract shared components** — reusable UI → `shared/`
-6. **Group into features** — related components → `features/<name>/`
-7. **Set up lazy loading** — configure routes for each feature
-8. **Update all imports** — fix paths across the application
-9. **Add barrel exports** — only for public APIs
-10. **Build the project** — `npx ng build` to detect circular dependencies and errors
-11. **Run ALL tests** — `npx ng test --watch=false`
-12. **Serve and verify** — `npx ng serve`, test navigation and lazy loading
+1. **Identify large components** → read `.html` and `.ts` files, list candidates by thresholds
+2. **Split monolithic components** → apply Step 3 for each candidate
+3. **Create directory structure** → `core/`, `shared/`, `features/`
+4. **Extract core services** → auth, interceptors, guards → `core/`
+5. **Extract shared components** → reusable UI → `shared/`
+6. **Group into features** → related components → `features/<name>/`
+7. **Set up lazy loading** → configure routes + `@defer` blocks
+8. **Update all imports** → fix paths across the application
+9. **Modernize APIs** → replace deprecated patterns (see Anti-Patterns table)
+10. **Build the project** → `npx ng build` to detect errors and circular dependencies
+11. **Run ALL tests** → `npx ng test --watch=false`
+12. **Serve and verify** → `npx ng serve`, test navigation and lazy loading
 
 ---
 
-## Step 11: Unit Testing
+## Step 12: Unit Testing
 
-Every new or moved file must have a corresponding `.spec.ts`:
+Every file must have a `.spec.ts`:
 
-- **Presentational components**: test rendering with different inputs, output emissions, user interactions
-- **Smart components**: test service calls, state management, child component coordination
+- **Presentational**: test rendering with different `input()` values, `output()` emissions, user interactions
+- **Smart**: test service calls, signal state management, child coordination
 - **Services**: test public methods, HTTP calls with `HttpTestingController`
-- **Guards**: test access conditions, redirects
+- **Guards**: test access conditions and redirects
 - **Pipes**: test transformations with edge cases
 - After restructuring, run ALL existing tests to verify nothing broke
 
@@ -608,8 +709,8 @@ Every new or moved file must have a corresponding `.spec.ts`:
 
 - **Always present before/after** structure to the user
 - **Ask confirmation** before moving files or splitting components
-- **Preserve git history** — use `git mv` for file moves
+- **Preserve git history** → use `git mv` for file moves
 - **Update `tsconfig.json`** path aliases after restructuring
 - **Verify `angular.json`** references after file moves
-- **Adapt to Angular version** — these practices apply universally but syntax differs per version
-- **Do not over-modularize** — if splitting adds more complexity than it solves, don't split
+- **Do not over-modularize** → if splitting adds more complexity than it solves, don't split
+- **Adapt to version** → use legacy APIs only if the project's Angular version requires it
