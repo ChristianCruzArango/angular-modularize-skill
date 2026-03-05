@@ -58,7 +58,7 @@ Or invoke directly: `/angular-modularize`
 
 ### Smart vs Presentational Pattern
 - **Smart (Container)**: injects services, fetches data, manages state
-- **Presentational (Dumb)**: receives `@Input()`, emits `@Output()`, renders UI only
+- **Presentational (Dumb)**: receives data via `input()`, emits events via `output()`, renders UI only
 
 ## References
 

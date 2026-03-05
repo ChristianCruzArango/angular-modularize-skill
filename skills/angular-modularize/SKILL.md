@@ -51,8 +51,8 @@ the create form AND validates input AND manages pagination."
 | Component class lines | > 200 lines | Extract logic to services |
 | File total lines | > 400 lines | Split responsibilities (Angular style guide rule) |
 | Constructor/inject dependencies | > 5 | Component has too many concerns |
-| Distinct `@if`/`*ngIf` sections | > 3 unrelated blocks | Each block → child component |
-| Distinct `@for`/`*ngFor` loops | > 2 different data sources | Each list → child component |
+| Distinct `@if` sections (or `*ngIf` in legacy code) | > 3 unrelated blocks | Each block → child component |
+| Distinct `@for` loops (or `*ngFor` in legacy code) | > 2 different data sources | Each list → child component |
 | Component fetches data AND renders it | Mixed smart/presentational | Split into container + presentational |
 | Repeated HTML blocks | Same block appears 2+ times | Extract to shared component |
 | Multiple form groups | > 2 in same component | Each form section → child component |
@@ -96,7 +96,7 @@ Analysis of a monolithic OrderPageComponent:
 | Type | Characteristics | Rules |
 |------|----------------|-------|
 | **Smart (Container)** | Injects services, fetches data, manages state, coordinates children | One per route/feature. Knows WHERE data comes from. |
-| **Presentational (Dumb)** | Receives `@Input()`, emits `@Output()`, renders UI only | No service injection. No business logic. Reusable across contexts. Does NOT know where data comes from. |
+| **Presentational (Dumb)** | Receives data via `input()`, emits events via `output()`, renders UI only | No service injection. No business logic. Reusable across contexts. Does NOT know where data comes from. |
 
 **Key test:** If the component wouldn't work in a completely different application
 without modification → it's smart. If it would → it's presentational.
@@ -114,9 +114,10 @@ without modification → it's smart. If it would → it's presentational.
 
 ### 3.4 Extract — Before and After
 
-**BEFORE — Monolithic (violates SRP):**
+**BEFORE — Monolithic (violates SRP, uses legacy patterns to show what needs refactoring):**
 
 ```typescript
+// BEFORE: legacy patterns — *ngFor, *ngIf, constructor injection, no OnPush, no signals
 @Component({
   selector: 'app-order-page',
   template: `
@@ -355,9 +356,9 @@ export class OrderPageComponent {
 
 | Pattern | When to Use |
 |---------|------------|
-| Parent passes `@Input()` down | Simple data flow, < 3 levels deep |
+| Parent passes data via `input()` | Simple data flow, < 3 levels deep |
 | Shared service with signals | Multiple siblings need same reactive state |
-| `@Output()` events up + `@Input()` down | Parent orchestrates child interactions |
+| `output()` events up + `input()` down | Parent orchestrates child interactions |
 | NgRx / signal store | Complex state with many consumers across features |
 
 **Rule:** Never create a service just to avoid passing one input. Use services when
